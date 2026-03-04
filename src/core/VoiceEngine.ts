@@ -1,43 +1,58 @@
-import { invoke } from "@tauri-apps/api/core"
+import { invoke } from "@tauri-apps/api/core";
 
 export class VoiceEngine {
-  private mediaRecorder: MediaRecorder | null = null
-  private chunks: BlobPart[] = []
+  private mediaRecorder: MediaRecorder | null = null;
+  private chunks: BlobPart[] = [];
+  private stream: MediaStream | null = null;
 
   async start(): Promise<void> {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-
-    this.mediaRecorder = new MediaRecorder(stream)
-    this.chunks = []
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.mediaRecorder = new MediaRecorder(this.stream);
+    this.chunks = [];
 
     this.mediaRecorder.ondataavailable = (e) => {
-      this.chunks.push(e.data)
-    }
+      if (e.data.size > 0) {
+        this.chunks.push(e.data);
+      }
+    };
 
-    this.mediaRecorder.start()
+    this.mediaRecorder.start();
   }
 
-async stop(): Promise<string> {
-  return new Promise((resolve) => {
-    if (!this.mediaRecorder) return;
+  async stop(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      if (!this.mediaRecorder) {
+        reject(new Error("No active recording"));
+        return;
+      }
 
-    this.mediaRecorder.onstop = async () => {
+      this.mediaRecorder.onstop = async () => {
+        // Stop all audio tracks to release the mic
+        if (this.stream) {
+          this.stream.getTracks().forEach((t) => t.stop());
+          this.stream = null;
+        }
 
-      const blob = new Blob(this.chunks, { type: "audio/webm" });
+        try {
+          const blob = new Blob(this.chunks, { type: "audio/webm" });
+          const arrayBuffer = await blob.arrayBuffer();
+          const audioBytes = Array.from(new Uint8Array(arrayBuffer));
 
-      const arrayBuffer = await blob.arrayBuffer();
-      const audioBytes = Array.from(new Uint8Array(arrayBuffer));
+          const path = await invoke<string>("save_temp_audio", {
+            data: audioBytes,
+          });
 
-      const path = await invoke<string>("save_temp_audio", {
-        data: audioBytes
-      });
+          const text = await invoke<string>("transcribe_audio", {
+            path,
+          });
 
-      const text = await invoke<string>("transcribe_audio", {
-        path: path
-      });
+          resolve(text);
+        } catch (err) {
+          reject(err);
+        }
+      };
 
-      resolve(text);
-    }
-    this.mediaRecorder.stop();
-  });
-}}
+      this.mediaRecorder.stop();
+    });
+  }
+}

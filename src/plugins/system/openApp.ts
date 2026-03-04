@@ -1,16 +1,18 @@
-import { invoke } from "@tauri-apps/api/core"
-import PermissionManager from "../../core/PermissionManager"
+import { invoke } from "@tauri-apps/api/core";
+import PermissionManager from "../../core/PermissionManager";
 
-export async function openApp(app: string) {
-
+export async function openApp(app: string): Promise<string> {
   if (!PermissionManager.canOpenApps()) {
-    return "System access is disabled."
+    return "System access is disabled. Enable it in permissions.";
   }
 
-  if (!app) return "Which app should I open?"
+  if (!app) return "Which app should I open, Boss?";
 
-  await invoke("open_app", { app })
-
-  return `Opening ${app}`
-
+  try {
+    await invoke("open_app", { app });
+    return `Opening ${app}`;
+  } catch (err) {
+    console.error("openApp error:", err);
+    return `Failed to open ${app}: ${err}`;
+  }
 }

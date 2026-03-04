@@ -1,3 +1,8 @@
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
 export interface LLMProvider {
-  sendMessage(prompt: string): Promise<string>;
+  sendMessages(messages: ChatMessage[]): Promise<string>;
 }
