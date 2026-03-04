@@ -1,0 +1,146 @@
+body {
+  margin: 0;
+  background: radial-gradient(circle at center, #0a0f1c 0%, #05070f 100%);
+  overflow: hidden;
+  font-family: "Segoe UI", sans-serif;
+  color: #00f0ff;
+}
+
+.jarvis-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  position: relative;
+}
+
+.hud-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 240, 255, 0.4);
+  animation: rotate linear infinite;
+}
+
+.outer {
+  width: 350px;
+  height: 350px;
+  animation-duration: 12s;
+}
+
+.inner {
+  width: 220px;
+  height: 220px;
+  animation-duration: 6s;
+  animation-direction: reverse;
+}
+
+.core {
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, #00f0ff 0%, #002233 70%);
+  border-radius: 50%;
+  box-shadow: 0 0 40px #00f0ff;
+}
+
+.status {
+  position: absolute;
+  bottom: 60px;
+  font-size: 14px;
+  letter-spacing: 3px;
+  opacity: 0.8;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* === State Effects === */
+
+.pulse {
+  animation: rotate 3s linear infinite;
+  border-color: rgba(0, 240, 255, 0.9);
+}
+
+.fast {
+  animation-duration: 2s !important;
+}
+
+.active-core {
+  box-shadow: 0 0 80px #00f0ff;
+  transform: scale(1.1);
+  transition: all 0.3s ease;
+}
+.panel {
+  position: absolute;
+  width: 300px;
+  min-height: 120px;
+  padding: 15px;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  background: rgba(0, 10, 20, 0.6);
+  backdrop-filter: blur(10px);
+  color: #00f0ff;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.left-panel {
+  left: 40px;
+  top: 100px;
+}
+
+.right-panel {
+  right: 40px;
+  top: 100px;
+}
+
+.panel h3 {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.settings-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: transparent;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 5, 15, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.settings-modal {
+  width: 400px;
+  padding: 25px;
+  background: rgba(0, 10, 20, 0.9);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-modal input,
+.settings-modal select {
+  background: black;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
+  padding: 5px;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
