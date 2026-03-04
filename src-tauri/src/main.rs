@@ -88,9 +88,17 @@ async fn llm_generate(prompt: String, model: String) -> Result<String, String> {
     let response = String::from_utf8_lossy(&output.stdout);
     Ok(response.to_string())
 }
+#[tauri::command]
+fn open_app(app: String) {
+    std::process::Command::new(app)
+        .spawn()
+        .expect("failed to open app");
+}
+
 
 fn main() {
     tauri::Builder::default()
+  .invoke_handler(tauri::generate_handler![open_app])
         .invoke_handler(tauri::generate_handler![
             save_temp_audio,
             transcribe_audio,
@@ -99,3 +107,4 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

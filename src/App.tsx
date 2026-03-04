@@ -2,8 +2,6 @@ import "./App.css";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useJarvis, ProviderType } from "./core/JarvisContext";
 import { VoiceEngine } from "./core/VoiceEngine";
-import { invoke } from "@tauri-apps/api/core";
-import { ProviderManager } from "./core/providers/ProviderManager";
 
 export default function App() {
   const {
@@ -23,90 +21,142 @@ export default function App() {
     setApiKey,
   } = useJarvis();
 
+  const { processCommand } = useJarvis();
+
   const [showSettings, setShowSettings] = useState(false);
 
-  // stable instances / refs so callbacks don't capture stale values
   const voiceRef = useRef(new VoiceEngine());
   const recordingRef = useRef(false);
 
-  const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
-    if (e.code === "Space" && !recordingRef.current) {
-      recordingRef.current = true;
-      setListening(true);
-      try {
-        await voiceRef.current.start();
-      } catch (err) {
-        console.error("failed to start recording", err);
-        recordingRef.current = false;
-        setListening(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationRef = useRef<number | null>(null);
+
+  // ---------- VISUALIZER ----------
+
+  const startVisualizer = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    const audioCtx = new AudioContext();
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+
+    analyser.fftSize = 256;
+    source.connect(analyser);
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    audioContextRef.current = audioCtx;
+    analyserRef.current = analyser;
+
+    const draw = () => {
+      animationRef.current = requestAnimationFrame(draw);
+
+      analyser.getByteFrequencyData(dataArray);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = canvas.width / bufferLength;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = dataArray[i] / 2;
+
+        ctx.fillStyle = "#00f7ff";
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+        x += barWidth;
       }
+    };
+
+    draw();
+  };
+
+  const stopVisualizer = () => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
     }
-  }, [setListening]);
 
-  const handleKeyUp = useCallback(async (e: KeyboardEvent) => {
-    if (e.code === "Space" && recordingRef.current) {
-      recordingRef.current = false;
-      setListening(false);
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+  };
 
-      let text: string;
-      try {
-        const audioBlob = await voiceRef.current.stop();
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
+  // ---------- KEYBOARD EVENTS ----------
 
-        const filePath = await invoke<string>("save_temp_audio", {
-          data: Array.from(uint8Array),
-        });
+  const handleKeyDown = useCallback(
+    async (e: KeyboardEvent) => {
+      if (e.code === "Space" && !recordingRef.current) {
+        recordingRef.current = true;
 
-        text = await invoke<string>("transcribe_audio", {
-          path: filePath,
-        });
+        setListening(true);
 
-        setTranscript(text);
-      } catch (err) {
-        console.error("recording/transcription failed", err);
-        return;
+        try {
+          await voiceRef.current.start();
+          startVisualizer();
+        } catch (err) {
+          console.error("failed to start recording", err);
+          recordingRef.current = false;
+          setListening(false);
+        }
       }
+    },
+    [setListening]
+  );
 
-      setThinking(true);
+  const handleKeyUp = useCallback(
+    async (e: KeyboardEvent) => {
+      if (e.code === "Space" && recordingRef.current) {
+        recordingRef.current = false;
 
-      try {
-        let raw: string;
+        setListening(false);
+        stopVisualizer();
 
-        if (provider === "ollama") {
-          raw = await invoke<string>("llm_generate", {
-            provider: "ollama",
-            prompt: text,
-            model: model || "qwen2.5-coder:7b",
-          });
-        } else if (provider === "openai") {
-          const pm = ProviderManager.create(provider, apiKey, model);
-          if (!pm) throw new Error("provider configuration missing");
-          const resp = await pm.sendMessage(text);
-          raw = JSON.stringify({ response: resp });
-        } else {
-          throw new Error("no provider selected");
+        let text: string;
+
+        try {
+          text = await voiceRef.current.stop();
+          setTranscript(text);
+        } catch (err) {
+          console.error("recording/transcription failed", err);
+          return;
         }
 
-        const parsed = JSON.parse(raw);
-        setResponse(parsed.response ?? "No response.");
-      } catch (err) {
-        console.error("LLM error", err);
-        setResponse("LLM error.");
-      } finally {
-        setThinking(false);
+        setThinking(true);
+
+        try {
+          await processCommand(text);
+        } catch (err) {
+          console.error("processCommand error", err);
+          setResponse("Command processing error.");
+        } finally {
+          setThinking(false);
+        }
       }
-    }
-  }, [provider, apiKey, model, setListening, setTranscript, setThinking, setResponse]);
+    },
+    [setListening, setTranscript, setThinking, setResponse, processCommand]
+  );
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
+
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [handleKeyDown, handleKeyUp]);
+
+  // ---------- UI ----------
 
   return (
     <div className="jarvis-container">
@@ -116,7 +166,14 @@ export default function App() {
 
       <div className={`hud-ring outer ${listening ? "pulse" : ""}`} />
       <div className={`hud-ring inner ${thinking ? "fast" : ""}`} />
-      <div className={`core ${thinking ? "active-core" : ""}`} />
+
+      <canvas
+        ref={canvasRef}
+        id="voice-visualizer"
+        width={200}
+        height={200}
+        className={`core ${thinking ? "active-core" : ""}`}
+      />
 
       <div className="status">
         {listening
@@ -170,15 +227,11 @@ export default function App() {
               type="text"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder={
-                provider === "ollama" ? "llama3" : "gpt-4o"
-              }
+              placeholder={provider === "ollama" ? "llama3" : "gpt-4o"}
             />
 
             <div className="settings-actions">
-              <button onClick={() => setShowSettings(false)}>
-                Close
-              </button>
+              <button onClick={() => setShowSettings(false)}>Close</button>
             </div>
           </div>
         </div>

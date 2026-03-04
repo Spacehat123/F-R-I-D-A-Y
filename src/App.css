@@ -144,3 +144,88 @@ body {
   justify-content: flex-end;
   margin-top: 10px;
 }
+.core-circle {
+  transition: transform 0.2s ease;
+}
+
+.core-circle.listening {
+  animation: pulse 1.2s infinite;
+}
+
+.core-circle.thinking {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 10px #00f7ff;
+  }
+
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 35px #00f7ff;
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px #00f7ff;
+  }
+}
+.hud-ring.outer.pulse {
+  animation: pulse-ring 1.2s infinite ease-in-out;
+}
+
+.hud-ring.inner.fast {
+  animation: think-ring 0.8s infinite linear;
+}
+
+.core.active-core {
+  animation: core-glow 1s infinite ease-in-out;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 10px #00f7ff;
+  }
+
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 35px #00f7ff;
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px #00f7ff;
+  }
+}
+
+@keyframes think-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes core-glow {
+  0% {
+    box-shadow: 0 0 10px #00f7ff;
+  }
+
+  50% {
+    box-shadow: 0 0 40px #00f7ff;
+  }
+
+  100% {
+    box-shadow: 0 0 10px #00f7ff;
+  }
+}
+
+#voice-visualizer {
+  display: block;
+  margin: auto;
+}
