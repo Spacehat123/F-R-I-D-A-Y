@@ -3,6 +3,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useJarvis, ProviderType } from "./core/JarvisContext";
 import { VoiceEngine } from "./core/VoiceEngine";
 
+// pdfjs is a relatively heavy library but we only use it when a PDF is uploaded
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+// the worker file is required for proper functioning
+GlobalWorkerOptions.workerSrc = 
+  "https://unpkg.com/pdfjs-dist@3.10.154/build/pdf.worker.min.js";
+
 export default function App() {
   const {
     listening,
@@ -21,7 +27,7 @@ export default function App() {
     setApiKey,
   } = useJarvis();
 
-  const { processCommand } = useJarvis();
+  const { processCommand, attachments, setAttachments } = useJarvis();
 
   const [showSettings, setShowSettings] = useState(false);
 
@@ -92,6 +98,7 @@ export default function App() {
   };
 
   // ---------- KEYBOARD EVENTS ----------
+  
 
   const handleKeyDown = useCallback(
     async (e: KeyboardEvent) => {
@@ -145,6 +152,54 @@ export default function App() {
     },
     [setListening, setTranscript, setThinking, setResponse, processCommand]
   );
+  async function extractPdfText(file: File): Promise<string> {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const strings = content.items.map((item: any) => item.str);
+        fullText += strings.join(" ") + "\n\n";
+      }
+      return fullText;
+    } catch (err) {
+      console.error("PDF parsing failed", err);
+      return "<unable to extract text from PDF>";
+    }
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+
+    let text: string;
+    if (
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf")
+    ) {
+      text = await extractPdfText(file);
+    } else {
+      text = await file.text();
+    }
+
+    const attachment = { name: file.name, content: text };
+    setAttachments((prev) => [...prev, attachment]);
+
+    setThinking(true);
+    try {
+      await processCommand(
+        `I've added the contents of ${file.name} to memory.`
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setThinking(false);
+    }
+  }
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -156,12 +211,48 @@ export default function App() {
     };
   }, [handleKeyDown, handleKeyUp]);
 
+  // file input reference for the + button
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    let text: string;
+    if (
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf")
+    ) {
+      text = await extractPdfText(file);
+    } else {
+      text = await file.text();
+    }
+
+    const attachment = { name: file.name, content: text };
+    setAttachments((prev) => [...prev, attachment]);
+
+    setThinking(true);
+    try {
+      await processCommand(`I've added the contents of ${file.name} to memory.`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setThinking(false);
+    }
+  };
+
   // ---------- UI ----------
 
   return (
     <div className="jarvis-container">
       <button className="settings-btn" onClick={() => setShowSettings(true)}>
         ⚙
+      </button>
+      <button
+        className="shutup-btn"
+        onClick={() => speechSynthesis.cancel()}
+>
+        🔇 Shut Up
       </button>
 
       <div className={`hud-ring outer ${listening ? "pulse" : ""}`} />
@@ -183,6 +274,22 @@ export default function App() {
           : "SYSTEM ONLINE"}
       </div>
 
+      {/* hidden input used by upload button */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: "none" }}
+        onChange={handleFileSelect}
+      />
+
+      <button
+        className="upload-btn"
+        onClick={() => fileInputRef.current?.click()}
+        title="Upload file to memory"
+      >
+        +
+      </button>
+
       <div className="panel left-panel">
         <h3>USER INPUT</h3>
         <p>{transcript}</p>
@@ -192,6 +299,25 @@ export default function App() {
         <h3>JARVIS RESPONSE</h3>
         <p>{response}</p>
       </div>
+
+      <div className="attachments-panel">
+        <h4>Memory Files</h4>
+        {attachments.length === 0 ? (
+          <p><em>No files loaded</em></p>
+        ) : (
+          <ul>
+            {attachments.map((a, i) => (
+              <li key={i}>{a.name}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div
+        className="jarvis-container"
+        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
+      ></div>
+
 
       {showSettings && (
         <div className="settings-overlay">

@@ -3,6 +3,7 @@ export type Intent =
   | "open_app"
   | "search_web"
   | "coding_help"
+  | "read_file"
   | "unknown"
 
 export interface IntentResult {
@@ -14,6 +15,10 @@ export class IntentEngine {
 
   static detect(text: string): IntentResult {
     const input = text.toLowerCase()
+    if (input.includes("stop") || input.includes("shut up")) {
+      speechSynthesis.cancel()
+      return { intent: "chat" }
+    }
 
     if (input.includes("open")) {
       return {
@@ -34,6 +39,11 @@ export class IntentEngine {
         intent: "coding_help"
       }
     }
+    if (input.includes("read file")) {
+      return {
+       intent: "read_file"
+     }
+   }
 
     return {
       intent: "chat"

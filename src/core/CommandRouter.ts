@@ -2,6 +2,7 @@ import { IntentResult } from "./IntentEngine"
 import { openApp } from "../plugins/system/openApp"
 import { searchWeb } from "../plugins/browser/searchWeb"
 import { AIProviderRouter } from "./providers/AIProviderRouter"
+import { readFile } from "../plugins/system/readFile"
 
 export class CommandRouter {
 
@@ -36,6 +37,8 @@ export class CommandRouter {
           apiKey,
           model
         )
+      case "read_file":
+        return await readFile()
 
       default:
         return "I didn't understand that."

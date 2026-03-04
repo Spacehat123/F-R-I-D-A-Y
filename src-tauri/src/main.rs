@@ -95,16 +95,23 @@ fn open_app(app: String) {
         .expect("failed to open app");
 }
 
-
+#[tauri::command]
+fn read_file(path: String) -> Result<String, String> {
+    match std::fs::read_to_string(path) {
+        Ok(contents) => Ok(contents),
+        Err(err) => Err(err.to_string()),
+    }
+}
 fn main() {
     tauri::Builder::default()
-  .invoke_handler(tauri::generate_handler![open_app])
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             save_temp_audio,
             transcribe_audio,
-            llm_generate
+            llm_generate,
+            open_app,
+            read_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-
